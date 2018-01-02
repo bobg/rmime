@@ -39,7 +39,7 @@ func ReadPart(r io.Reader, header *Header) (*Part, error) {
 // removed. Text is normalized to utf8 if possible, and CRLFs to LFs,
 // and trailing blank lines are removed. Text/plain formatting per
 // RFC3676 is also done. It is an error to call Body on non-leaf parts
-// (multipart/*, message/*).  TODO: handle format=flowed and delsp=yes
+// (multipart/*, message/*).
 func (p *Part) Body() (io.Reader, error) {
 	switch p.MajorType() {
 	case "multipart", "message":
