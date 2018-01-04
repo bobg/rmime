@@ -19,6 +19,11 @@ type Header struct {
 	DefaultType string   `json:"default_type"`
 }
 
+type Address struct {
+	Name    string `json:"name,omitempty"`
+	Address string `json:"address,omitempty"`
+}
+
 // ErrHeaderSyntax is the error indicating bad mail header syntax.
 var ErrHeaderSyntax = errors.New("bad syntax in header")
 
@@ -150,33 +155,35 @@ func (h Header) Encoding() string {
 }
 
 // Sender returns the parsed sender address.
-func (h Header) Sender() *mail.Address {
+func (h Header) Sender() *Address {
 	f := h.findField("From") // xxx Resent-From? Sender?
 	if f == nil {
 		return nil
 	}
-	res, err := mail.ParseAddress(f.Value())
+	a, err := mail.ParseAddress(f.Value())
 	if err != nil {
 		return nil
 	}
-	return res
+	return &Address{Name: a.Name, Address: a.Address}
 }
 
 var recipientFields = []string{"To", "Cc", "Bcc"} // xxx Resent-To, Resent-Cc, Resent-Bcc?
 
 // Recipients returns the parsed recipient addresses.
-func (h Header) Recipients() []*mail.Address {
-	var res []*mail.Address
+func (h Header) Recipients() []*Address {
+	var res []*Address
 	for _, name := range recipientFields {
 		f := h.findField(name)
 		if f == nil {
 			continue
 		}
-		a, err := mail.ParseAddressList(f.Value())
+		as, err := mail.ParseAddressList(f.Value())
 		if err != nil {
 			continue
 		}
-		res = append(res, a...)
+		for _, a := range as {
+			res = append(res, &Address{Name: a.Name, Address: a.Address})
+		}
 	}
 	return res
 }
