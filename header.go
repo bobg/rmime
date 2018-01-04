@@ -149,6 +149,38 @@ func (h Header) Encoding() string {
 	return f.Value()
 }
 
+// Sender returns the parsed sender address.
+func (h Header) Sender() *mail.Address {
+	f := h.findField("From") // xxx Resent-From? Sender?
+	if f == nil {
+		return nil
+	}
+	res, err := mail.ParseAddress(f.Value())
+	if err != nil {
+		return nil
+	}
+	return res
+}
+
+var recipientFields = []string{"To", "Cc", "Bcc"} // xxx Resent-To, Resent-Cc, Resent-Bcc?
+
+// Recipients returns the parsed recipient addresses.
+func (h Header) Recipients() []*mail.Address {
+	var res []*mail.Address
+	for _, name := range recipientFields {
+		f := h.findField(name)
+		if f == nil {
+			continue
+		}
+		a, err := mail.ParseAddressList(f.Value())
+		if err != nil {
+			continue
+		}
+		res = append(res, a...)
+	}
+	return res
+}
+
 func (h Header) findField(name string) *Field {
 	for i := len(h.Fields) - 1; i >= 0; i-- {
 		if h.Fields[i].Name() == name {
