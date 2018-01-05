@@ -98,6 +98,18 @@ func (h Header) Params() map[string]string {
 	return params
 }
 
+func (h Header) Disposition() (string, map[string]string) {
+	f := h.findField("Content-Disposition")
+	if f == nil {
+		return "inline", nil
+	}
+	tok, params, err := mime.ParseMediaType(f.Value())
+	if err != nil {
+		return "inline", nil
+	}
+	return tok, params
+}
+
 // Charset returns the character set indicated by h (when h has
 // content-type text/*).
 func (h Header) Charset() string {
