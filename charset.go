@@ -6,7 +6,15 @@ import (
 	"golang.org/x/text/encoding/ianaindex"
 )
 
+// Map from common non-canonical charset names to canonical ones.
+var canonicalCharsets = map[string]string{
+	"ascii": "us-ascii",
+}
+
 func charsetReader(label string, inp io.Reader) (io.Reader, error) {
+	if l, ok := canonicalCharsets[label]; ok {
+		label = l
+	}
 	enc, err := ianaindex.MIME.Encoding(label)
 	if err != nil {
 		enc, err = ianaindex.IANA.Encoding(label)

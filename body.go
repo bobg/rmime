@@ -9,6 +9,8 @@ import (
 
 var ErrUnimplemented = errors.New("unimplemented")
 
+// TODO: further parse message/delivery-status bodies (parse out
+// specific fields).
 type DeliveryStatus struct {
 	Message    *Header   `json:"message"`
 	Recipients []*Header `json:"recipients"`
