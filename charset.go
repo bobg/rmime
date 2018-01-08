@@ -2,16 +2,19 @@ package rmime
 
 import (
 	"io"
+	"strings"
 
 	"golang.org/x/text/encoding/ianaindex"
 )
 
 // Map from common non-canonical charset names to canonical ones.
 var canonicalCharsets = map[string]string{
-	"ascii": "us-ascii",
+	"ascii":  "us-ascii",
+	"cp1252": "cp-1252",
 }
 
 func charsetReader(label string, inp io.Reader) (io.Reader, error) {
+	label = strings.ToLower(strings.TrimSpace(label))
 	if l, ok := canonicalCharsets[label]; ok {
 		label = l
 	}
