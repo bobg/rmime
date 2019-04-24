@@ -1,0 +1,4 @@
+github.com/bobg/chanrw v0.0.0-20190424130733-d2b0be94fe58 h1:ujEl7bUa51ZxOk2eOdLWaP31TIAJc69VWhZXH9dZJYk=
+github.com/bobg/chanrw v0.0.0-20190424130733-d2b0be94fe58/go.mod h1:5XkzwRFot3ysCwfxy64EXarkeqS45kxaXS7JqP3L9CI=
+golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
