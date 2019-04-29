@@ -27,7 +27,7 @@ func ReadBody(r io.Reader, header *Header) (interface{}, error) {
 	switch header.MajorType() {
 	case "message":
 		switch header.MinorType() {
-		case "rfc822":
+		case "rfc822", "news": // message/news == message/rfc822 per RFC5537
 			return ReadMessage(r)
 
 		case "external-body":
