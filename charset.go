@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/text/encoding/htmlindex"
 	"golang.org/x/text/encoding/ianaindex"
 )
@@ -16,7 +17,7 @@ func charsetReader(label string, inp io.Reader) (io.Reader, error) {
 		if err != nil {
 			enc, err = htmlindex.Get(label)
 			if err != nil {
-				return nil, wrapf(err, "charset %s", label)
+				return nil, errors.Wrapf(err, "charset %s", label)
 			}
 		}
 	}

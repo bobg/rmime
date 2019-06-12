@@ -2,12 +2,13 @@ package rmime
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"mime"
 	"net/mail"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // Header is a message or message-part header. It consists of a
@@ -41,7 +42,7 @@ func ReadHeader(r io.Reader, defaultType string) (*Header, error) {
 		}
 		if isContinuationLine(line) {
 			if latestField == nil {
-				return nil, wrapf(ErrHeaderSyntax, "unexpected continuation line")
+				return nil, errors.Wrapf(ErrHeaderSyntax, "unexpected continuation line")
 			}
 			latestField.V = append(latestField.V, string(line))
 			continue
