@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime"
 	"net/mail"
+	"regexp"
 	"strings"
 	"time"
 
@@ -144,6 +145,8 @@ func (h Header) Subject() string {
 	return res
 }
 
+var trailingParenTextRegex = regexp.MustCompile(`\s*\([^()]*\)\s*$`)
+
 // Time returns the parsed time of h, or the zero time if absent or
 // unparseable.
 func (h Header) Time() time.Time {
@@ -151,7 +154,16 @@ func (h Header) Time() time.Time {
 	if f == nil {
 		return time.Time{}
 	}
-	t, err := mail.ParseDate(f.Value())
+	v := f.Value()
+
+	t, err := mail.ParseDate(v)
+	if err == nil {
+		return t
+	}
+
+	// Try again, removing any trailing parenthesized string like " (Pacific Daylight Time)".
+	v = trailingParenTextRegex.ReplaceAllString(v, "")
+	t, err = mail.ParseDate(v)
 	if err != nil {
 		return time.Time{}
 	}
