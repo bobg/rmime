@@ -1,6 +1,7 @@
 package rmime
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -18,10 +19,20 @@ func TestMime(t *testing.T) {
 		r := strings.NewReader(c.inp)
 		m, err := ReadMessage(r)
 		if err != c.wantErr {
-			t.Errorf("got %s, want %s", err, c.wantErr)
+			t.Errorf("got error %v, want %v", err, c.wantErr)
 		} else {
 			j, _ := json.Marshal(m)
 			t.Log(string(j))
+		}
+
+		buf := new(bytes.Buffer)
+		_, err = m.WriteTo(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := buf.String()
+		if got != c.inp {
+			t.Errorf("message re-rendering mismatch, got:\n%s\n\nwant:\n%s", got, c.inp)
 		}
 	}
 }
