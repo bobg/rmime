@@ -253,3 +253,51 @@ func readHeaderFieldLine(r io.Reader) ([]byte, error) {
 func isContinuationLine(line []byte) bool {
 	return len(line) > 0 && (line[0] == ' ' || line[0] == '\t')
 }
+
+// This regex is a cheat.
+// Message IDs are allowed to contain interior angle-brackets (via quoting),
+// but if any are encountered in the wild this software is surely not the only that will break.
+var msgIDRegex = regexp.MustCompile(`<([^<>]+@[^<>]+)>`)
+
+// MessageID returns the parsed contents of the Message-Id field
+// or "" if not found or parseable.
+//
+// Per RFC2822, "the angle bracket characters are not part of the
+// msg-id; the msg-id is what is contained between the two angle
+// bracket characters."
+func (h Header) MessageID() string {
+	f := h.findField("Message-Id")
+	if f == nil {
+		return ""
+	}
+	if m := msgIDRegex.FindStringSubmatch(f.Value()); len(m) > 0 {
+		return m[1]
+	}
+	return ""
+}
+
+// InReplyTo returns the list of message-ids in the In-Reply-To field(s).
+// The message ids are parsed as in Header.MessageID.
+func (h Header) InReplyTo() []string {
+	return h.messageIDs("In-Reply-To")
+}
+
+// References returns the list of message-ids in the References field(s).
+// The message ids are parsed as in Header.MessageID.
+func (h Header) References() []string {
+	return h.messageIDs("References")
+}
+
+func (h Header) messageIDs(fieldName string) []string {
+	f := h.findField(fieldName)
+	if f == nil {
+		return nil
+	}
+
+	var result []string
+	matches := msgIDRegex.FindAllStringSubmatch(f.Value(), -1)
+	for _, m := range matches {
+		result = append(result, m[1])
+	}
+	return result
+}
