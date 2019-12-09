@@ -4,16 +4,16 @@ import (
 	"bufio"
 	"io"
 	"strings"
-
-	"github.com/bobg/chanrw"
 )
 
 func TextPlainReader(r io.Reader, flowed, delsp bool) io.Reader {
 	if !flowed {
 		return r
 	}
+
 	s := bufio.NewScanner(r)
-	ch := make(chan []byte)
+	pr, pw := io.Pipe()
+
 	go func() {
 		var (
 			para       []string
@@ -27,11 +27,11 @@ func TextPlainReader(r io.Reader, flowed, delsp bool) io.Reader {
 			}
 			for _, line := range para {
 				if quoteDepth > 0 {
-					ch <- []byte(strings.Repeat(">", quoteDepth))
-					ch <- []byte(" ")
+					io.WriteString(pw, strings.Repeat(">", quoteDepth))
+					io.WriteString(pw, " ")
 				}
-				ch <- []byte(line)
-				ch <- []byte("\n")
+				io.WriteString(pw, line)
+				io.WriteString(pw, "\n")
 			}
 			para = nil
 			quoteDepth = 0
@@ -79,12 +79,13 @@ func TextPlainReader(r io.Reader, flowed, delsp bool) io.Reader {
 				para = append(para, line)
 				quoteDepth = lineQuoteDepth
 			} else {
-				ch <- []byte(line)
-				ch <- []byte("\n")
+				io.WriteString(pw, line)
+				io.WriteString(pw, "\n")
 			}
 		}
 		emitPara()
-		close(ch)
+		pw.Close()
 	}()
-	return chanrw.NewReader(ch)
+
+	return pr
 }

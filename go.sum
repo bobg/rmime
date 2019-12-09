@@ -1,5 +1,3 @@
-github.com/bobg/chanrw v1.0.0 h1:ELwUMkDlngwYaE36+PKaYbDPYxwa8I9Z+vca68au0N0=
-github.com/bobg/chanrw v1.0.0/go.mod h1:5XkzwRFot3ysCwfxy64EXarkeqS45kxaXS7JqP3L9CI=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=

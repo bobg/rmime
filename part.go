@@ -7,8 +7,6 @@ import (
 	"io"
 	"mime/quotedprintable"
 	"strings"
-
-	"github.com/bobg/chanrw"
 )
 
 // Part is a message part, consisting of a header and a body.
@@ -72,7 +70,8 @@ func (p *Part) Body() (io.Reader, error) {
 			}
 		}
 		s := bufio.NewScanner(r)
-		ch := make(chan []byte)
+		pr, pw := io.Pipe()
+
 		go func() {
 			// Buffer blank lines, emit only when followed by a non-blank line.
 			blankLines := 0
@@ -82,16 +81,17 @@ func (p *Part) Body() (io.Reader, error) {
 					blankLines++
 				} else {
 					for blankLines > 0 {
-						ch <- []byte("\n")
+						io.WriteString(pw, "\n")
 						blankLines--
 					}
-					ch <- []byte(line)
-					ch <- []byte("\n")
+					io.WriteString(pw, line)
+					io.WriteString(pw, "\n")
 				}
 			}
-			close(ch)
+			pw.Close()
 		}()
-		r = chanrw.NewReader(ch)
+
+		r = pr
 	}
 	return r, nil
 }
