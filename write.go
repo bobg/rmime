@@ -147,6 +147,7 @@ func (f Field) WriteTo(w io.Writer) (int64, error) {
 	return n, nil
 }
 
+// WriteTo implements io.WriterTo.
 func (ds *DeliveryStatus) WriteTo(w io.Writer) (int64, error) {
 	n, err := ds.Message.WriteTo(w)
 	if err != nil {

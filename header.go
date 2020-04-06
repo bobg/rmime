@@ -12,15 +12,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Header is a message or message-part header. It consists of a
-// sequence of fields and a default content-type dictated by context:
-// text/plain by default, message/rfc822 for child parts of a
-// multipart/digest.
+// Header is a message header or message-part header.
+// It consists of a sequence of fields
+// and a default content-type dictated by context:
+// text/plain by default,
+// message/rfc822 for the children of a multipart/digest.
 type Header struct {
 	Fields      []*Field `json:"fields"`
 	DefaultType string   `json:"default_type"`
 }
 
+// Address is the type of an e-mail address.
 type Address struct {
 	Name    string `json:"name,omitempty"`
 	Address string `json:"address,omitempty"`
@@ -29,7 +31,8 @@ type Address struct {
 // ErrHeaderSyntax is the error indicating bad mail header syntax.
 var ErrHeaderSyntax = errors.New("bad syntax in header")
 
-// ReadHeader reads a message or message-part header from r.
+// ReadHeader reads a message header or message-part header from r,
+// which must be positioned at the start of the header.
 func ReadHeader(r io.Reader, defaultType string) (*Header, error) {
 	result := &Header{DefaultType: defaultType}
 	var latestField *Field
@@ -88,6 +91,8 @@ func (h Header) MinorType() string {
 	return t[1]
 }
 
+// Params parses the key=value pairs in the Content-Type field, if any
+// The return value may be nil.
 func (h Header) Params() map[string]string {
 	f := h.findField("Content-Type")
 	if f == nil {
@@ -100,6 +105,10 @@ func (h Header) Params() map[string]string {
 	return params
 }
 
+// Disposition parses the Content-Disposition field.
+// The first return value is normally "inline" or "attachment".
+// The second is a map of associated key=value pairs, and may be nil.
+// If there is no Content-Disposition field, this function returns "inline", nil.
 func (h Header) Disposition() (string, map[string]string) {
 	f := h.findField("Content-Disposition")
 	if f == nil {

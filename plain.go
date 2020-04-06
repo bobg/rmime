@@ -6,6 +6,9 @@ import (
 	"strings"
 )
 
+// TextPlainReader decodes text/plain body parts using the "flowed" and "delsp" features.
+// Note that Part.Body() already returns a TextPlainReader when Part.Type() is "text/plain".
+// If flowed==false, TextPlainReader simply returns its input, r.
 func TextPlainReader(r io.Reader, flowed, delsp bool) io.Reader {
 	if !flowed {
 		return r

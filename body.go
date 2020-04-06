@@ -7,10 +7,12 @@ import (
 	"io/ioutil"
 )
 
+// ErrUnimplemented is the error indicating an unimplemented feature.
 var ErrUnimplemented = errors.New("unimplemented")
 
-// TODO: further parse message/delivery-status bodies (parse out
-// specific fields).
+// DeliveryStatus is the type of a parsed message/delivery-status body part.
+// TODO: further parse message/delivery-status bodies
+// (parse out specific fields).
 type DeliveryStatus struct {
 	Message    *Header   `json:"message"`
 	Recipients []*Header `json:"recipients"`
