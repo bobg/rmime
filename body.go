@@ -48,7 +48,7 @@ func ReadBody(r io.Reader, header *Header) (interface{}, error) {
 			var perRecipient []*Header
 			for {
 				h, err := ReadHeader(r, "text/plain")
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				if err != nil {

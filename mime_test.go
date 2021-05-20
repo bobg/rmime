@@ -3,6 +3,7 @@ package rmime
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,7 +29,7 @@ func TestMime(t *testing.T) {
 	for _, c := range cases {
 		r := strings.NewReader(c.inp)
 		m, err := ReadMessage(r)
-		if err != c.wantErr {
+		if !errors.Is(err, c.wantErr) {
 			t.Errorf("got error %v, want %v", err, c.wantErr)
 		} else {
 			j, _ := json.Marshal(m)

@@ -33,7 +33,12 @@ var ErrHeaderSyntax = errors.New("bad syntax in header")
 
 // ReadHeader reads a message header or message-part header from r,
 // which must be positioned at the start of the header.
+// The defaultType parameter sets the DefaultType field of the resulting Header.
+// Pass "" to get the default defaultType of "text/plain".
 func ReadHeader(r io.Reader, defaultType string) (*Header, error) {
+	if defaultType == "" {
+		defaultType = "text/plain"
+	}
 	result := &Header{DefaultType: defaultType}
 	var latestField *Field
 	for {
@@ -68,7 +73,7 @@ func (h Header) Type() string {
 		return h.DefaultType
 	}
 	t, _, err := mime.ParseMediaType(f.Value())
-	if err != nil && err != mime.ErrInvalidMediaParameter {
+	if err != nil && !errors.Is(err, mime.ErrInvalidMediaParameter) {
 		return h.DefaultType
 	}
 	if !strings.Contains(t, "/") {
@@ -91,7 +96,7 @@ func (h Header) MinorType() string {
 	return t[1]
 }
 
-// Params parses the key=value pairs in the Content-Type field, if any
+// Params parses the key=value pairs in the Content-Type field, if any.
 // The return value may be nil.
 func (h Header) Params() map[string]string {
 	f := h.findField("Content-Type")
