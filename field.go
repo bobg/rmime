@@ -10,7 +10,7 @@ type Field struct {
 
 // Name returns the name of a field in canonical form.
 func (f Field) Name() string {
-	return strings.Title(strings.TrimSpace(f.N))
+	return strings.Title(strings.ToLower(strings.TrimSpace(f.N)))
 }
 
 // Value returns the values of the field combined with canonical
