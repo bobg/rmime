@@ -35,7 +35,7 @@ var ErrHeaderSyntax = errors.New("bad syntax in header")
 // which must be positioned at the start of the header.
 // The defaultType parameter sets the DefaultType field of the resulting Header.
 // Pass "" to get the default defaultType of "text/plain".
-func ReadHeader(r io.Reader, defaultType string) (*Header, error) {
+func ReadHeader(r io.ByteReader, defaultType string) (*Header, error) {
 	if defaultType == "" {
 		defaultType = "text/plain"
 	}
@@ -238,28 +238,27 @@ func (h Header) findField(name string) *Field {
 
 // Requires and removes a terminating \n (and an optional preceding
 // \r).
-func readHeaderFieldLine(r io.Reader) ([]byte, error) {
+func readHeaderFieldLine(r io.ByteReader) ([]byte, error) {
 	var (
 		result    []byte
 		pendingCR bool
 	)
 	for {
-		var b [1]byte
-		_, err := io.ReadFull(r, b[:])
+		b, err := r.ReadByte()
 		if err != nil {
 			return nil, err
 		}
-		if b[0] == '\n' {
+		if b == '\n' {
 			return result, nil
 		}
 		if pendingCR {
 			result = append(result, '\r')
 			pendingCR = false
 		}
-		if b[0] == '\r' {
+		if b == '\r' {
 			pendingCR = true
 		} else {
-			result = append(result, b[0])
+			result = append(result, b)
 		}
 	}
 }

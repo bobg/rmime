@@ -17,7 +17,7 @@ type Part struct {
 
 // ReadPart reads a message part from r after having read and parsed a
 // header for it.
-func ReadPart(r io.Reader, header *Header) (*Part, error) {
+func ReadPart(r Reader, header *Header) (*Part, error) {
 	defaultType := "text/plain"
 	if header != nil && header.Type() == "multipart/digest" {
 		defaultType = "message/rfc822"

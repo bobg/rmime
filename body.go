@@ -25,7 +25,7 @@ type DeliveryStatus struct {
 //   message/delivery-status: *DeliveryStatus
 //   multipart/*:             *Multipart
 //   */*:                     string
-func ReadBody(r io.Reader, header *Header) (interface{}, error) {
+func ReadBody(r Reader, header *Header) (interface{}, error) {
 	switch header.MajorType() {
 	case "message":
 		switch header.MinorType() {
