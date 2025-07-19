@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/bobg/errors"
 )
 
 // Header is a message header or message-part header.

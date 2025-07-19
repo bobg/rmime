@@ -7,6 +7,8 @@ import (
 	"io"
 	"mime/quotedprintable"
 	"strings"
+
+	"github.com/bobg/errors"
 )
 
 // Part is a message part, consisting of a header and a body.
@@ -33,12 +35,11 @@ func ReadPart(r Reader, header *Header) (*Part, error) {
 	return &Part{Header: innerHeader, B: body}, nil
 }
 
-// Body produces a reader over the decoded body. Transfer encoding is
-// removed. Text is normalized to utf8 if possible, and CRLFs to LFs,
-// and trailing blank lines are removed. Text/plain formatting per
-// RFC3676 is also done. It is an error to call Body on non-leaf parts
-// (multipart/*, message/*).
-func (p *Part) Body() (io.Reader, error) {
+// Raw produces a reader over the body of the part.
+// It does no decoding.
+//
+// It is an error to call Raw on non-leaf parts (multipart/*, message/*).
+func (p *Part) Raw() (io.Reader, error) {
 	switch p.MajorType() {
 	case "multipart", "message":
 		return nil, fmt.Errorf("cannot call Body() on type %s", p.Type())
@@ -47,8 +48,26 @@ func (p *Part) Body() (io.Reader, error) {
 	if !ok {
 		return nil, fmt.Errorf("Content-Type is %s but body object is %T (want string)", p.Type(), p.B)
 	}
-	var r io.Reader
-	r = strings.NewReader(body)
+
+	return strings.NewReader(body), nil
+}
+
+// Body produces a reader over the decoded body.
+// Transfer encoding is removed.
+// Text is normalized to utf8 if possible, and CRLFs to LFs.
+// Trailing blank lines are removed.
+// Text/plain formatting per RFC3676 is also done.
+// It is an error to call Body on non-leaf parts
+// (multipart/*, message/*).
+func (p *Part) Body() (io.Reader, error) {
+	var (
+		r   io.Reader
+		err error
+	)
+	if r, err = p.Raw(); err != nil {
+		return nil, errors.Wrap(err, "getting raw body")
+	}
+
 	switch p.Encoding() {
 	case "quoted-printable":
 		r = quotedprintable.NewReader(r)

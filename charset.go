@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/bobg/errors"
 	"golang.org/x/text/encoding/htmlindex"
 	"golang.org/x/text/encoding/ianaindex"
 )

@@ -21,10 +21,11 @@ type DeliveryStatus struct {
 // ReadBody reads a message body from r after the header has been read
 // and parsed. The type of the result depends on the content-type
 // specified in the header:
-//   message/rfc822:          *Message
-//   message/delivery-status: *DeliveryStatus
-//   multipart/*:             *Multipart
-//   */*:                     string
+//
+//	message/rfc822:          *Message
+//	message/delivery-status: *DeliveryStatus
+//	multipart/*:             *Multipart
+//	*/*:                     string
 func ReadBody(r Reader, header *Header) (interface{}, error) {
 	switch header.MajorType() {
 	case "message":
