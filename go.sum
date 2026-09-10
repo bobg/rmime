@@ -2,3 +2,5 @@ github.com/bobg/errors v1.1.0 h1:gsVanPzJMpZQpwY+27/GQYElZez5CuMYwiIpk2A3RGw=
 github.com/bobg/errors v1.1.0/go.mod h1:Q4775qBZpnte7EGFJqmvnlB1U4pkI1XmU3qxqdp7Zcc=
 golang.org/x/text v0.27.0 h1:4fGWRpyh641NLlecmyl4LOe6yDdfaYNrGb2zdfo4JV4=
 golang.org/x/text v0.27.0/go.mod h1:1D28KMCvyooCX9hBiosv5Tz/+YLxj0j7XhWjpSUF7CU=
+golang.org/x/text v0.30.0 h1:yznKA/E9zq54KzlzBEAWn1NXSQ8DIp/NYMy88xJjl4k=
+golang.org/x/text v0.30.0/go.mod h1:yDdHFIX9t+tORqspjENWgzaCVXgk0yYnYuSZ8UzzBVM=

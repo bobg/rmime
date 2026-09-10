@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 )
 
 // ErrUnimplemented is the error indicating an unimplemented feature.
@@ -69,7 +68,7 @@ func ReadBody(r Reader, header *Header) (interface{}, error) {
 	case "multipart":
 		return readMultipart(r, header)
 	}
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

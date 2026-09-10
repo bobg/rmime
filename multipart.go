@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 )
 
@@ -48,7 +47,7 @@ func readMultipart(r io.Reader, header *Header) (*Multipart, error) {
 		}
 		parts = append(parts, part)
 		if isFinal {
-			postamble, err := ioutil.ReadAll(r)
+			postamble, err := io.ReadAll(r)
 			if err != nil {
 				return nil, err
 			}

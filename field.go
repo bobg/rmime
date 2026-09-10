@@ -1,6 +1,12 @@
 package rmime
 
-import "strings"
+import (
+	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"golang.org/x/text/transform"
+)
 
 // Field is a field in a message or message-part header.
 type Field struct {
@@ -10,7 +16,13 @@ type Field struct {
 
 // Name returns the name of a field in canonical form.
 func (f Field) Name() string {
-	return strings.Title(strings.ToLower(strings.TrimSpace(f.N)))
+	result := strings.TrimSpace(f.N)
+	result = strings.ToLower(result)
+
+	titler := cases.Title(language.AmericanEnglish)
+	result, _, _ = transform.String(titler, result)
+
+	return result
 }
 
 // Value returns the values of the field combined with canonical
