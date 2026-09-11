@@ -26,11 +26,11 @@ func ReadPart(r Reader, header *Header) (*Part, error) {
 	}
 	innerHeader, err := ReadHeader(r, defaultType)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "reading part header")
 	}
 	body, err := ReadBody(r, innerHeader)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "reading part body")
 	}
 	return &Part{Header: innerHeader, B: body}, nil
 }
@@ -78,7 +78,7 @@ func (p *Part) Body() (io.Reader, error) {
 		var err error
 		r, err = charsetReader(p.Charset(), r)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "getting charset reader for %q", p.Charset())
 		}
 		if p.MinorType() == "plain" {
 			params := p.Params()

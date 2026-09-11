@@ -1,7 +1,10 @@
 package rmime
 
 import (
+	"fmt"
 	"io"
+
+	"github.com/bobg/errors"
 )
 
 // WriteTo implements the io.WriterTo interface.
@@ -13,7 +16,7 @@ func (m *Message) WriteTo(w io.Writer) (int64, error) {
 func (p *Part) WriteTo(w io.Writer) (int64, error) {
 	n, err := p.Header.WriteTo(w)
 	if err != nil {
-		return n, err
+		return n, errors.Wrap(err, "writing part header")
 	}
 
 	switch p.MajorType() {
@@ -25,58 +28,33 @@ func (p *Part) WriteTo(w io.Writer) (int64, error) {
 		}
 
 		body := p.B.(*Multipart)
-		n2, err := w.Write([]byte(body.Preamble)) // note, this assumes Preamble ends in a newline
+		n2, err := fmt.Fprint(w, body.Preamble) // note, this assumes Preamble ends in a newline
 		n += int64(n2)
 		if err != nil {
-			return n, err
+			return n, errors.Wrap(err, "writing multipart body preamble")
 		}
 
 		for _, subpart := range body.Parts {
-			n2, err = w.Write([]byte("--"))
+			n2, err = fmt.Fprintf(w, "--%s\n", boundary)
 			n += int64(n2)
 			if err != nil {
-				return n, err
-			}
-			n2, err = w.Write([]byte(boundary))
-			n += int64(n2)
-			if err != nil {
-				return n, err
-			}
-			n2, err = w.Write([]byte("\n"))
-			n += int64(n2)
-			if err != nil {
-				return n, err
+				return n, errors.Wrap(err, "writing multipart body boundary")
 			}
 
 			n3, err := subpart.WriteTo(w)
 			n += n3
 			if err != nil {
-				return n, err
+				return n, errors.Wrap(err, "writing multipart subpart")
 			}
 		}
-		n2, err = w.Write([]byte("--"))
+		n2, err = fmt.Fprintf(w, "--%s--\n", boundary)
 		n += int64(n2)
 		if err != nil {
-			return n, err
+			return n, errors.Wrap(err, "writing multipart body closing boundary")
 		}
-		n2, err = w.Write([]byte(boundary))
+		n2, err = fmt.Fprint(w, body.Postamble)
 		n += int64(n2)
-		if err != nil {
-			return n, err
-		}
-		n2, err = w.Write([]byte("--"))
-		n += int64(n2)
-		if err != nil {
-			return n, err
-		}
-		n2, err = w.Write([]byte("\n"))
-		n += int64(n2)
-		if err != nil {
-			return n, err
-		}
-		n2, err = w.Write([]byte(body.Postamble))
-		n += int64(n2)
-		return n, err
+		return n, errors.Wrap(err, "writing multipart body postamble")
 
 	case "message":
 		switch p.MinorType() {
@@ -84,23 +62,29 @@ func (p *Part) WriteTo(w io.Writer) (int64, error) {
 			body := p.B.(*Message)
 			n2, err := body.WriteTo(w)
 			n += n2
-			return n, err
+			return n, errors.Wrap(err, "writing message/rfc822 body")
 
 		case "delivery-status":
-			body := p.B.(*DeliveryStatus)
+			body, ok := p.B.(*DeliveryStatus)
+			if !ok {
+				return n, fmt.Errorf("unexpected body type %T for message/delivery-status part", p.B)
+			}
 			n2, err := body.WriteTo(w)
 			n += n2
-			return n, err
+			return n, errors.Wrap(err, "writing message/delivery-status body")
 
-		default:
-			return n, ErrUnimplemented
+		default: // xxx
+			return n, errors.Wrapf(ErrUnimplemented, "writing message/%s part", p.MinorType())
 		}
 
 	default:
-		body := p.B.(string)
-		n2, err := w.Write([]byte(body))
+		body, ok := p.B.(string)
+		if !ok {
+			return n, fmt.Errorf("unexpected body type %T for non-multipart, non-message part", p.B)
+		}
+		n2, err := fmt.Fprint(w, body)
 		n += int64(n2)
-		return n, err
+		return n, errors.Wrap(err, "writing body of non-multipart, non-message part")
 	}
 }
 
@@ -111,37 +95,22 @@ func (h Header) WriteTo(w io.Writer) (int64, error) {
 		n1, err := f.WriteTo(w)
 		n += n1
 		if err != nil {
-			return n, err
+			return n, errors.Wrap(err, "writing header field")
 		}
 	}
-	_, err := w.Write([]byte("\n"))
-	n++
-	return n, err
+	n2, err := fmt.Fprint(w, "\n")
+	n += int64(n2)
+	return n, errors.Wrap(err, "writing final newline after header")
 }
 
 // WriteTo implements the io.WriterTo interface.
 func (f Field) WriteTo(w io.Writer) (int64, error) {
 	var n int64
 	for _, v := range f.V {
-		n2, err := w.Write([]byte(f.N))
+		n2, err := fmt.Fprintf(w, "%s:%s\n", f.N, v)
 		n += int64(n2)
 		if err != nil {
-			return n, err
-		}
-		n2, err = w.Write([]byte(":"))
-		n += int64(n2)
-		if err != nil {
-			return n, err
-		}
-		n2, err = w.Write([]byte(v))
-		n += int64(n2)
-		if err != nil {
-			return n, err
-		}
-		n2, err = w.Write([]byte("\n"))
-		n += int64(n2)
-		if err != nil {
-			return n, err
+			return n, errors.Wrapf(err, "writing field %q", f.N)
 		}
 	}
 	return n, nil
@@ -151,13 +120,13 @@ func (f Field) WriteTo(w io.Writer) (int64, error) {
 func (ds *DeliveryStatus) WriteTo(w io.Writer) (int64, error) {
 	n, err := ds.Message.WriteTo(w)
 	if err != nil {
-		return n, err
+		return n, errors.Wrap(err, "writing per-message header fields")
 	}
 	for _, recip := range ds.Recipients {
 		n2, err := recip.WriteTo(w)
 		n += n2
 		if err != nil {
-			return n, err
+			return n, errors.Wrap(err, "writing per-recipient header fields")
 		}
 	}
 	return n, nil
