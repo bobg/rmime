@@ -71,11 +71,15 @@ func multipartReaders(r io.Reader, boundary string) (preambleReader io.Reader, p
 	ch := make(chan Reader)
 
 	go func() {
-		defer close(ch)
-		defer preamblePipeW.Close()
-		defer postamblePipeW.Close()
+		var chClosed, final bool
 
-		var final bool
+		defer func() {
+			if !chClosed {
+				close(ch)
+			}
+			preamblePipeW.CloseWithError(outerErr)
+			postamblePipeW.CloseWithError(outerErr)
+		}()
 
 		lineReaders, errptr := seqs.LongLines(r)
 		for r := range lineReaders {
@@ -88,10 +92,6 @@ func multipartReaders(r io.Reader, boundary string) (preambleReader io.Reader, p
 			var match bool
 			match, final = isBoundary(line, boundary)
 			if match {
-				if err := preamblePipeW.Close(); err != nil {
-					outerErr = errors.Wrap(err, "closing preamble pipe")
-					return
-				}
 				break
 			}
 
@@ -100,6 +100,11 @@ func multipartReaders(r io.Reader, boundary string) (preambleReader io.Reader, p
 				outerErr = errors.Wrap(err, "writing preamble")
 				return
 			}
+		}
+
+		if err := preamblePipeW.Close(); err != nil {
+			outerErr = errors.Wrap(err, "closing preamble pipe")
+			return
 		}
 
 		for !final {
@@ -113,6 +118,9 @@ func multipartReaders(r io.Reader, boundary string) (preambleReader io.Reader, p
 				return
 			}
 		}
+
+		close(ch)
+		chClosed = true
 
 		for r := range lineReaders {
 			line, err := io.ReadAll(r)
