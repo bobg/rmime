@@ -174,7 +174,7 @@ func isBoundary(line []byte, boundary string) (match bool, final bool) {
 	if !bytes.Equal(line[:2], []byte("--")) {
 		return false, false
 	}
-	if !bytes.Equal(line[2:2+len(boundary)], []byte(boundary)) {
+	if string(line[2:2+len(boundary)]) != boundary {
 		return false, false
 	}
 	rest := line[2+len(boundary):]
@@ -183,12 +183,15 @@ func isBoundary(line []byte, boundary string) (match bool, final bool) {
 		rest = rest[2:]
 	}
 	// allow only LWSP and \r?\n
-	if rest[len(rest)-1] == '\n' {
+	if len(rest) > 0 && rest[len(rest)-1] == '\n' {
 		rest = rest[:len(rest)-1]
+		if len(rest) > 0 && rest[len(rest)-1] == '\r' {
+			rest = rest[:len(rest)-1]
+		}
 	}
 	for _, r := range rest {
 		switch r {
-		case ' ', '\f', '\r', '\t', '\v':
+		case ' ', '\f', '\t', '\v':
 			// ignore
 		default:
 			return false, false
