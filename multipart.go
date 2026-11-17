@@ -139,16 +139,20 @@ func (pr *preambleReaderImpl) Read(p []byte) (int, error) {
 	line, ok := pr.s.readNextLine()
 	if !ok {
 		pr.s.stage = stageDone
-		if pr.s.err != nil {
-			return 0, pr.s.err
+		if pr.s.err == nil {
+			pr.s.err = errors.Wrap(io.ErrUnexpectedEOF, "while reading multipart preamble")
 		}
-		return 0, io.EOF
+		return 0, pr.s.err
 	}
 
 	match, final := isBoundary(line, pr.s.boundary)
 	if match {
-		pr.s.stage = stagePart
 		pr.s.final = final
+		if final {
+			pr.s.stage = stagePostamble
+		} else {
+			pr.s.stage = stagePart
+		}
 		return 0, io.EOF
 	}
 
@@ -172,13 +176,14 @@ func (s *mpStream) partSeq() iter.Seq[reader] {
 			pr := &singlePartReaderImpl{s: s}
 			bufPR := bufio.NewReader(pr)
 			if !yield(bufPR) {
+				s.stage = stageDone
+				s.lineStop()
 				return
 			}
 			if err := pr.drain(); err != nil {
 				return
 			}
 		}
-		s.stage = stagePostamble
 	}
 }
 
@@ -268,6 +273,9 @@ func (po *postambleReaderImpl) Read(p []byte) (int, error) {
 			return 0, err
 		}
 	}
+	if po.s.err != nil {
+		return 0, po.s.err
+	}
 	if po.s.stage > stagePostamble {
 		return 0, io.EOF
 	}
@@ -306,7 +314,6 @@ func (s *mpStream) drainParts() error {
 			return err
 		}
 	}
-	s.stage = stagePostamble
 	return nil
 }
 

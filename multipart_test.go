@@ -1,6 +1,7 @@
 package rmime
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -91,6 +92,84 @@ func TestMultipartReaders(t *testing.T) {
 			t.Fatalf("reading postamble: %v", err)
 		}
 		if got, want := string(postamble), "postamble line 1\npostamble line 2\n"; got != want {
+			t.Errorf("postamble got %q, want %q", got, want)
+		}
+
+		if err := *errptr; err != nil {
+			t.Errorf("errptr got %v, want nil", err)
+		}
+	})
+
+	t.Run("NoBoundary", func(t *testing.T) {
+		r := strings.NewReader("preamble without boundary\n")
+		preambleR, _, _, errptr := multipartReaders(r, "boundary")
+
+		_, err := io.ReadAll(preambleR)
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Errorf("reading preamble got error %v, want io.ErrUnexpectedEOF", err)
+		}
+		if !errors.Is(*errptr, io.ErrUnexpectedEOF) {
+			t.Errorf("errptr got %v, want io.ErrUnexpectedEOF", *errptr)
+		}
+	})
+
+	t.Run("TruncatedPart", func(t *testing.T) {
+		r := strings.NewReader("preamble\n--boundary\npart 1 line 1\n")
+		preambleR, parts, postambleR, errptr := multipartReaders(r, "boundary")
+
+		preamble, err := io.ReadAll(preambleR)
+		if err != nil {
+			t.Fatalf("reading preamble: %v", err)
+		}
+		if got, want := string(preamble), "preamble\n"; got != want {
+			t.Errorf("preamble got %q, want %q", got, want)
+		}
+
+		var partErr error
+		for partR := range parts {
+			_, err := io.ReadAll(partR)
+			if err != nil {
+				partErr = err
+			}
+		}
+		if !errors.Is(partErr, io.ErrUnexpectedEOF) {
+			t.Errorf("reading part got error %v, want io.ErrUnexpectedEOF", partErr)
+		}
+
+		_, err = io.ReadAll(postambleR)
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Errorf("reading postamble got error %v, want io.ErrUnexpectedEOF", err)
+		}
+		if !errors.Is(*errptr, io.ErrUnexpectedEOF) {
+			t.Errorf("errptr got %v, want io.ErrUnexpectedEOF", *errptr)
+		}
+	})
+
+	t.Run("FinalBoundaryFirst", func(t *testing.T) {
+		r := strings.NewReader("preamble\n--boundary--\npostamble\n")
+		preambleR, parts, postambleR, errptr := multipartReaders(r, "boundary")
+
+		preamble, err := io.ReadAll(preambleR)
+		if err != nil {
+			t.Fatalf("reading preamble: %v", err)
+		}
+		if got, want := string(preamble), "preamble\n"; got != want {
+			t.Errorf("preamble got %q, want %q", got, want)
+		}
+
+		var count int
+		for range parts {
+			count++
+		}
+		if count != 0 {
+			t.Errorf("got %d parts, want 0", count)
+		}
+
+		postamble, err := io.ReadAll(postambleR)
+		if err != nil {
+			t.Fatalf("reading postamble: %v", err)
+		}
+		if got, want := string(postamble), "postamble\n"; got != want {
 			t.Errorf("postamble got %q, want %q", got, want)
 		}
 
