@@ -63,116 +63,251 @@ func readMultipart(r io.Reader, header *Header) (*Multipart, error) {
 }
 
 func multipartReaders(r io.Reader, boundary string) (preambleReader io.Reader, partReaders iter.Seq[Reader], postambleReader io.Reader, errptr *error) {
-	var outerErr error
+	lineReaders, linesErrPtr := seqs.LongLines(r)
+	next, stop := iter.Pull(lineReaders)
 
-	preamblePipeR, preamblePipeW := io.Pipe()
-	postamblePipeR, postamblePipeW := io.Pipe()
-
-	ch := make(chan Reader)
-
-	go func() {
-		var chClosed, final bool
-
-		defer func() {
-			if !chClosed {
-				close(ch)
-			}
-			preamblePipeW.CloseWithError(outerErr)
-			postamblePipeW.CloseWithError(outerErr)
-		}()
-
-		lineReaders, errptr := seqs.LongLines(r)
-		for r := range lineReaders {
-			line, err := io.ReadAll(r)
-			if err != nil {
-				outerErr = errors.Wrap(err, "reading line in preamble")
-				return
-			}
-
-			var match bool
-			match, final = isBoundary(line, boundary)
-			if match {
-				break
-			}
-
-			line = append(line, '\n')
-			if _, err := preamblePipeW.Write(line); err != nil {
-				outerErr = errors.Wrap(err, "writing preamble")
-				return
-			}
-		}
-
-		if err := preamblePipeW.Close(); err != nil {
-			outerErr = errors.Wrap(err, "closing preamble pipe")
-			return
-		}
-
-		for !final {
-			partR, partW := io.Pipe()
-			ch <- bufio.NewReader(partR)
-
-			var err error
-			final, err = copyUntilBoundary(lineReaders, partW, boundary)
-			if err != nil {
-				outerErr = errors.Wrap(err, "copying part")
-				return
-			}
-		}
-
-		close(ch)
-		chClosed = true
-
-		for r := range lineReaders {
-			line, err := io.ReadAll(r)
-			if err != nil {
-				outerErr = errors.Wrap(err, "reading line in postamble")
-				return
-			}
-
-			line = append(line, '\n')
-			if _, err := postamblePipeW.Write(line); err != nil {
-				outerErr = errors.Wrap(err, "writing postamble")
-				return
-			}
-		}
-
-		if err := postamblePipeW.Close(); err != nil {
-			outerErr = errors.Wrap(err, "closing postamble pipe")
-			return
-		}
-
-		if err := *errptr; err != nil {
-			outerErr = errors.Wrap(err, "reading multipart")
-			return
-		}
-	}()
-
-	return preamblePipeR, seqs.FromChan(ch), postamblePipeR, &outerErr
-}
-
-func copyUntilBoundary(lineReaders iter.Seq[io.Reader], w *io.PipeWriter, boundary string) (final bool, err error) {
-	defer func() {
-		if err2 := w.CloseWithError(err); err2 != nil {
-			err2 = errors.Wrap(err2, "closing pipe after error")
-			err = errors.Join(err, err2)
-		}
-	}()
-
-	for r := range lineReaders {
-		line, err := io.ReadAll(r)
-		if err != nil {
-			return false, errors.Wrap(err, "reading line in multipart part")
-		}
-		if match, final := isBoundary(line, boundary); match {
-			return final, nil
-		}
-		line = append(line, '\n')
-		if _, err := w.Write(line); err != nil {
-			return false, errors.Wrap(err, "writing line of multipart part")
-		}
+	s := &mpStream{
+		lineNext: next,
+		lineStop: stop,
+		boundary: boundary,
+		linesErr: linesErrPtr,
+		stage:    stagePreamble,
 	}
 
-	return false, errors.Wrap(io.ErrUnexpectedEOF, "while reading multipart part")
+	preamble := &preambleReaderImpl{s: s}
+	parts := s.partSeq()
+	postamble := &postambleReaderImpl{s: s}
+
+	return preamble, parts, postamble, &s.err
+}
+
+type mStage int
+
+const (
+	stagePreamble mStage = iota
+	stagePart
+	stagePostamble
+	stageDone
+)
+
+type mpStream struct {
+	lineNext func() (io.Reader, bool)
+	lineStop func()
+	boundary string
+	linesErr *error
+	err      error
+	buf      []byte
+	stage    mStage
+	final    bool
+}
+
+func (s *mpStream) readNextLine() ([]byte, bool) {
+	if s.err != nil {
+		return nil, false
+	}
+	r, ok := s.lineNext()
+	if !ok {
+		s.lineStop()
+		if s.linesErr != nil && *s.linesErr != nil {
+			s.err = *s.linesErr
+		}
+		return nil, false
+	}
+	line, err := io.ReadAll(r)
+	if err != nil {
+		s.err = err
+		s.lineStop()
+		return nil, false
+	}
+	return line, true
+}
+
+type preambleReaderImpl struct {
+	s *mpStream
+}
+
+func (pr *preambleReaderImpl) Read(p []byte) (int, error) {
+	if pr.s.stage > stagePreamble {
+		return 0, io.EOF
+	}
+	if len(pr.s.buf) > 0 {
+		n := copy(p, pr.s.buf)
+		pr.s.buf = pr.s.buf[n:]
+		return n, nil
+	}
+
+	line, ok := pr.s.readNextLine()
+	if !ok {
+		pr.s.stage = stageDone
+		if pr.s.err != nil {
+			return 0, pr.s.err
+		}
+		return 0, io.EOF
+	}
+
+	match, final := isBoundary(line, pr.s.boundary)
+	if match {
+		pr.s.stage = stagePart
+		pr.s.final = final
+		return 0, io.EOF
+	}
+
+	line = append(line, '\n')
+	n := copy(p, line)
+	if n < len(line) {
+		pr.s.buf = append(pr.s.buf, line[n:]...)
+	}
+	return n, nil
+}
+
+func (s *mpStream) partSeq() iter.Seq[Reader] {
+	return func(yield func(Reader) bool) {
+		if s.stage == stagePreamble {
+			if err := s.drainPreamble(); err != nil {
+				return
+			}
+		}
+
+		for s.stage == stagePart && !s.final {
+			pr := &singlePartReaderImpl{s: s}
+			bufPR := bufio.NewReader(pr)
+			if !yield(bufPR) {
+				return
+			}
+			if err := pr.drain(); err != nil {
+				return
+			}
+		}
+		s.stage = stagePostamble
+	}
+}
+
+func (s *mpStream) drainPreamble() error {
+	pr := &preambleReaderImpl{s: s}
+	buf := make([]byte, 1024)
+	for s.stage == stagePreamble {
+		_, err := pr.Read(buf)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type singlePartReaderImpl struct {
+	s    *mpStream
+	done bool
+}
+
+func (pr *singlePartReaderImpl) Read(p []byte) (int, error) {
+	if pr.done || pr.s.stage != stagePart {
+		return 0, io.EOF
+	}
+	if len(pr.s.buf) > 0 {
+		n := copy(p, pr.s.buf)
+		pr.s.buf = pr.s.buf[n:]
+		return n, nil
+	}
+
+	line, ok := pr.s.readNextLine()
+	if !ok {
+		pr.done = true
+		pr.s.stage = stageDone
+		if pr.s.err != nil {
+			return 0, pr.s.err
+		}
+		pr.s.err = errors.Wrap(io.ErrUnexpectedEOF, "while reading multipart part")
+		return 0, pr.s.err
+	}
+
+	match, final := isBoundary(line, pr.s.boundary)
+	if match {
+		pr.done = true
+		pr.s.final = final
+		if final {
+			pr.s.stage = stagePostamble
+		}
+		return 0, io.EOF
+	}
+
+	line = append(line, '\n')
+	n := copy(p, line)
+	if n < len(line) {
+		pr.s.buf = append(pr.s.buf, line[n:]...)
+	}
+	return n, nil
+}
+
+func (pr *singlePartReaderImpl) drain() error {
+	if pr.done {
+		return nil
+	}
+	buf := make([]byte, 1024)
+	for !pr.done {
+		_, err := pr.Read(buf)
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type postambleReaderImpl struct {
+	s *mpStream
+}
+
+func (po *postambleReaderImpl) Read(p []byte) (int, error) {
+	if po.s.stage < stagePostamble {
+		if err := po.s.drainParts(); err != nil {
+			return 0, err
+		}
+	}
+	if po.s.stage > stagePostamble {
+		return 0, io.EOF
+	}
+	if len(po.s.buf) > 0 {
+		n := copy(p, po.s.buf)
+		po.s.buf = po.s.buf[n:]
+		return n, nil
+	}
+
+	line, ok := po.s.readNextLine()
+	if !ok {
+		po.s.stage = stageDone
+		if po.s.err != nil {
+			return 0, po.s.err
+		}
+		return 0, io.EOF
+	}
+
+	line = append(line, '\n')
+	n := copy(p, line)
+	if n < len(line) {
+		po.s.buf = append(po.s.buf, line[n:]...)
+	}
+	return n, nil
+}
+
+func (s *mpStream) drainParts() error {
+	if s.stage == stagePreamble {
+		if err := s.drainPreamble(); err != nil {
+			return err
+		}
+	}
+	for s.stage == stagePart && !s.final {
+		pr := &singlePartReaderImpl{s: s}
+		if err := pr.drain(); err != nil {
+			return err
+		}
+	}
+	s.stage = stagePostamble
+	return nil
 }
 
 func isBoundary(line []byte, boundary string) (match bool, final bool) {
