@@ -17,9 +17,11 @@ type Part struct {
 	B interface{} `json:"body"`
 }
 
-// ReadPart reads a message part from r after having read and parsed a
+// ReadPart reads a message part from inp after having read and parsed a
 // header for it.
-func ReadPart(r Reader, header *Header) (*Part, error) {
+func ReadPart(inp io.Reader, header *Header) (*Part, error) {
+	r := ensureReader(inp)
+
 	defaultType := "text/plain"
 	if header != nil && header.Type() == "multipart/digest" {
 		defaultType = "message/rfc822"

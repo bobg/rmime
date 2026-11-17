@@ -6,14 +6,9 @@ import "io"
 // message.
 type Message Part
 
-// Reader is an io.Reader and an io.ByteReader.
-type Reader interface {
-	io.Reader
-	io.ByteReader
-}
-
 // ReadMessage reads a message from r.
-func ReadMessage(r Reader) (*Message, error) {
-	part, err := ReadPart(r, nil)
+func ReadMessage(r io.Reader) (*Message, error) {
+	rr := ensureReader(r)
+	part, err := ReadPart(rr, nil)
 	return (*Message)(part), err
 }

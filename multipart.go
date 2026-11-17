@@ -62,7 +62,7 @@ func readMultipart(r io.Reader, header *Header) (*Multipart, error) {
 	return &Multipart{Preamble: string(preamble), Postamble: string(postamble), Parts: parts}, nil
 }
 
-func multipartReaders(r io.Reader, boundary string) (preambleReader io.Reader, partReaders iter.Seq[Reader], postambleReader io.Reader, errptr *error) {
+func multipartReaders(r io.Reader, boundary string) (preambleReader io.Reader, partReaders iter.Seq[reader], postambleReader io.Reader, errptr *error) {
 	lineReaders, linesErrPtr := seqs.LongLines(r)
 	next, stop := iter.Pull(lineReaders)
 
@@ -160,8 +160,8 @@ func (pr *preambleReaderImpl) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-func (s *mpStream) partSeq() iter.Seq[Reader] {
-	return func(yield func(Reader) bool) {
+func (s *mpStream) partSeq() iter.Seq[reader] {
+	return func(yield func(reader) bool) {
 		if s.stage == stagePreamble {
 			if err := s.drainPreamble(); err != nil {
 				return

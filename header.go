@@ -31,11 +31,13 @@ type Address struct {
 // ErrHeaderSyntax is the error indicating bad mail header syntax.
 var ErrHeaderSyntax = errors.New("bad syntax in header")
 
-// ReadHeader reads a message header or message-part header from r,
+// ReadHeader reads a message header or message-part header from inp,
 // which must be positioned at the start of the header.
 // The defaultType parameter sets the DefaultType field of the resulting Header.
 // Pass "" to get the default defaultType of "text/plain".
-func ReadHeader(r io.ByteReader, defaultType string) (*Header, error) {
+func ReadHeader(inp io.Reader, defaultType string) (*Header, error) {
+	r := ensureReader(inp)
+
 	if defaultType == "" {
 		defaultType = "text/plain"
 	}
@@ -236,8 +238,7 @@ func (h Header) findField(name string) *Field {
 	return nil
 }
 
-// Requires and removes a terminating \n (and an optional preceding
-// \r).
+// Requires and removes a terminating \n (and an optional preceding \r).
 func readHeaderFieldLine(r io.ByteReader) ([]byte, error) {
 	var (
 		result    []byte

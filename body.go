@@ -17,7 +17,7 @@ type DeliveryStatus struct {
 	Recipients []*Header `json:"recipients"`
 }
 
-// ReadBody reads a message body from r after the header has been read
+// ReadBody reads a message body from inp after the header has been read
 // and parsed. The type of the result depends on the content-type
 // specified in the header:
 //
@@ -25,7 +25,9 @@ type DeliveryStatus struct {
 //	message/delivery-status: *DeliveryStatus
 //	multipart/*:             *Multipart
 //	*/*:                     string
-func ReadBody(r Reader, header *Header) (interface{}, error) {
+func ReadBody(inp io.Reader, header *Header) (interface{}, error) {
+	r := ensureReader(inp)
+
 	switch header.MajorType() {
 	case "message":
 		switch header.MinorType() {
